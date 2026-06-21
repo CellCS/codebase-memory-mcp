@@ -335,8 +335,8 @@ void cbm_watcher_unwatch(cbm_watcher_t *w, const char *project_name) {
          * drain this list at the start of its next cycle. */
         if (w->pending_free_count >= w->pending_free_cap) {
             int new_cap = w->pending_free_cap ? w->pending_free_cap * 2 : 8;
-            project_state_t **tmp = realloc(w->pending_free,
-                                           (size_t)new_cap * sizeof(project_state_t *));
+            project_state_t **tmp =
+                realloc(w->pending_free, (size_t)new_cap * sizeof(project_state_t *));
             if (tmp) {
                 w->pending_free = tmp;
                 w->pending_free_cap = new_cap;
