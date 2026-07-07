@@ -4929,6 +4929,35 @@ TEST(detect_changes_rejects_option_like_base_branch) {
     PASS();
 }
 
+/* Opt-in workspace boundary: when CBM_ALLOWED_ROOT is set, index_repository
+ * must refuse a repo_path that resolves outside it. Unset (the default) imposes
+ * no restriction. */
+TEST(index_repository_honors_allowed_root) {
+    char allowed[512];
+    snprintf(allowed, sizeof(allowed), "%s/cbm_allowed_XXXXXX", cbm_tmpdir());
+    if (!cbm_mkdtemp(allowed)) {
+        FAIL("cbm_mkdtemp failed");
+    }
+    cbm_setenv("CBM_ALLOWED_ROOT", allowed, 1);
+
+    cbm_mcp_server_t *srv = cbm_mcp_server_new(NULL);
+    char args[1024];
+    snprintf(args, sizeof(args),
+             "{\"jsonrpc\":\"2.0\",\"id\":88,\"method\":\"tools/call\","
+             "\"params\":{\"name\":\"index_repository\","
+             "\"arguments\":{\"repo_path\":\"%s/../..\"}}}",
+             allowed); /* resolves to a parent, outside the allowed root */
+    char *resp = cbm_mcp_server_handle(srv, args);
+    ASSERT_NOT_NULL(resp);
+    ASSERT_NOT_NULL(strstr(resp, "outside the allowed root"));
+    free(resp);
+
+    cbm_unsetenv("CBM_ALLOWED_ROOT");
+    cbm_mcp_server_free(srv);
+    cbm_rmdir(allowed);
+    PASS();
+}
+
 /* ══════════════════════════════════════════════════════════════════
  *  SUITE
  * ══════════════════════════════════════════════════════════════════ */
@@ -4936,6 +4965,7 @@ TEST(detect_changes_rejects_option_like_base_branch) {
 SUITE(mcp) {
     RUN_TEST(mcp_path_within_root_rejects_escape);
     RUN_TEST(detect_changes_rejects_option_like_base_branch);
+    RUN_TEST(index_repository_honors_allowed_root);
     /* JSON-RPC parsing */
     RUN_TEST(jsonrpc_parse_request);
     RUN_TEST(jsonrpc_parse_notification);

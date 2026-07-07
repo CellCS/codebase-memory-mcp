@@ -3842,6 +3842,8 @@ char *cbm_mcp_index_run_supervised_path(const char *root_path) {
     return index_run_supervised_path(NULL, root_path);
 }
 
+bool cbm_path_within_root(const char *root_path, const char *abs_path); /* defined below */
+
 static char *handle_index_repository(cbm_mcp_server_t *srv, const char *args) {
     /* Supervisor gate: run the index in a crash/hang-isolating worker subprocess
      * unless this process IS the worker or the kill switch (CBM_INDEX_SUPERVISOR=0)
@@ -3865,6 +3867,20 @@ static char *handle_index_repository(cbm_mcp_server_t *srv, const char *args) {
     }
 
     repo_path = canonicalize_repo_path_if_exists(repo_path);
+
+    /* Optional workspace boundary: when CBM_ALLOWED_ROOT is set (agentic /
+     * multi-tenant deployments where repo_path may be influenced by an
+     * untrusted caller), refuse to index a path that resolves outside it.
+     * Unset by default, so the standard "index the path I gave you" behaviour
+     * is unchanged. */
+    const char *allowed_root = getenv("CBM_ALLOWED_ROOT");
+    if (allowed_root && allowed_root[0] && repo_path &&
+        !cbm_path_within_root(allowed_root, repo_path)) {
+        free(mode_str);
+        free(name_override);
+        free(repo_path);
+        return cbm_mcp_text_result("repo_path is outside the allowed root", true);
+    }
 
     if (mode_str && strcmp(mode_str, "cross-repo-intelligence") == 0) {
         free(mode_str);
